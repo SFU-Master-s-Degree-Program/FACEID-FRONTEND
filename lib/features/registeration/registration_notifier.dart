@@ -27,8 +27,8 @@ class RegistrationNotifier extends Notifier<RegistrationState> {
   Future<void> pickImages() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final List<XFile>? pickedFiles = await picker.pickMultiImage();
-      if (pickedFiles != null && pickedFiles.isNotEmpty) {
+      final List<XFile> pickedFiles = await picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
         state = state.copyWith(images: [...state.images, ...pickedFiles]);
         talker.info('Изображения выбраны: ${pickedFiles.length}');
       }

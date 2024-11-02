@@ -6,16 +6,9 @@ import 'auth_state.dart';
 class AuthNotifier extends StateNotifier<AuthState> {
   MediaStream? _stream;
 
-  AuthNotifier() : super(AuthState(localRenderer: RTCVideoRenderer())) {
-    _init();
-  }
+  AuthNotifier() : super(AuthState());
 
-  Future<void> _init() async {
-    await state.localRenderer.initialize();
-    await startCamera();
-  }
-
-  Future<void> startCamera() async {
+  Future<void> startCamera(RTCVideoRenderer renderer) async {
     final mediaConstraints = {
       'audio': false,
       'video': {'facingMode': 'user'},
@@ -23,7 +16,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       _stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      state.localRenderer.srcObject = _stream;
+      renderer.srcObject = _stream;
       state = state.copyWith(isCameraOn: true);
       talker.info('Камера успешно запущена');
     } catch (e, st) {
@@ -36,7 +29,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (_stream != null) {
         _stream!.getTracks().forEach((track) => track.stop());
         _stream = null;
-        state.localRenderer.srcObject = null;
         state = state.copyWith(isCameraOn: false);
         talker.info('Камера отключена');
       }
@@ -48,7 +40,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   @override
   void dispose() {
     stopCamera();
-    state.localRenderer.dispose();
     super.dispose();
   }
 }

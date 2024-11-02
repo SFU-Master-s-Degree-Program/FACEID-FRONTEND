@@ -8,6 +8,7 @@ final registrationNotifierProvider =
     NotifierProvider<RegistrationNotifier, RegistrationState>(
         RegistrationNotifier.new);
 
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
-  (ref) => AuthNotifier(),
-);
+final authProvider =
+    StateNotifierProvider.autoDispose<AuthNotifier, AuthState>((ref) {
+  return AuthNotifier();
+});
