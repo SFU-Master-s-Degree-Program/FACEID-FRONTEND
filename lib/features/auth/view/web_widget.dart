@@ -1,8 +1,7 @@
-import 'package:universal_html/html.dart' as html;
-import 'dart:ui' as ui;
+import 'dart:html' as html;
+import 'dart:ui_web';
+import 'package:face_id/main.dart';
 import 'package:flutter/material.dart';
-
-import '../../../main.dart';
 
 class WebCameraWidget extends StatefulWidget {
   const WebCameraWidget({super.key});
@@ -41,13 +40,17 @@ class WebCameraWidgetState extends State<WebCameraWidget>
 
         final String viewId = 'webcam-${_videoElement!.hashCode}';
 
-        // ignore: undefined_prefixed_name
-        ui.platformViewRegistry
-            .registerViewFactory(viewId, (int viewId) => _videoElement!);
+        platformViewRegistry.registerViewFactory(
+          viewId,
+          (int viewId) => _videoElement!,
+        );
 
-        setState(() {
-          // Обновляем состояние для отображения видео
-        });
+        // Проверяем, что виджет все еще смонтирован
+        if (mounted) {
+          setState(() {
+            // Обновляем состояние для отображения видео
+          });
+        }
       } catch (e) {
         talker.error('Ошибка при доступе к камере: $e');
       }

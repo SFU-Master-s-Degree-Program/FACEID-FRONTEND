@@ -36,8 +36,8 @@ class MyApp extends ConsumerWidget {
         ),
       ],
       errorBuilder: (context, state) => const ErrorPage(),
+      routerNeglect: false,
     );
-
     return TalkerWrapper(
       talker: talker,
       child: MaterialApp.router(
