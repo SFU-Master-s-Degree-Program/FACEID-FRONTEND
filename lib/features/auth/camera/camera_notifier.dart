@@ -3,11 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:js_util' as js_util;
 import '../../../app/face_detection.dart';
 import 'camera_state.dart';
+import 'package:flutter/widgets.dart';
 
-class CameraNotifier extends StateNotifier<CameraState> {
+class CameraNotifier extends StateNotifier<CameraState>
+    with WidgetsBindingObserver {
   html.MediaStream? _mediaStream;
+  int? _requestAnimationFrameId;
 
-  CameraNotifier() : super(CameraState());
+  CameraNotifier() : super(CameraState()) {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   Future<void> initializeCamera() async {
     if (html.window.navigator.mediaDevices != null) {
@@ -96,12 +101,16 @@ class CameraNotifier extends StateNotifier<CameraState> {
   }
 
   void _detectFaces(dynamic options) async {
+    if (!mounted) return;
+
     if (state.videoElement == null || state.canvasElement == null) return;
 
     // Обнаружение лиц
     final detections = await js_util.promiseToFuture(
       detectAllFaces(state.videoElement, options),
     );
+
+    if (!mounted) return;
 
     // Очищаем canvas
     final context = state.canvasElement!.context2D;
@@ -149,12 +158,17 @@ class CameraNotifier extends StateNotifier<CameraState> {
       print('Лица не обнаружены');
     }
 
-    // Запрашиваем следующий кадр
-    html.window.requestAnimationFrame((_) => _detectFaces(options));
+    // Запрашиваем следующий кадр, если виджет все еще смонтирован
+    if (mounted) {
+      _requestAnimationFrameId =
+          html.window.requestAnimationFrame((_) => _detectFaces(options));
+    }
   }
 
   void _startImageCapture() {
     Future.doWhile(() async {
+      if (!mounted) return false;
+
       if (state.captureCount >= 6 || state.videoElement == null) {
         state = state.copyWith(isCapturing: false);
         print('Захвачено 6 снимков');
@@ -174,12 +188,14 @@ class CameraNotifier extends StateNotifier<CameraState> {
       String dataUrl = snapshotCanvas.toDataUrl();
 
       // Обновляем состояние
-      state = state.copyWith(
-        captureCount: state.captureCount + 1,
-        capturedImageUrls: [...state.capturedImageUrls, dataUrl],
-      );
+      if (mounted) {
+        state = state.copyWith(
+          captureCount: state.captureCount + 1,
+          capturedImageUrls: [...state.capturedImageUrls, dataUrl],
+        );
 
-      print('Снимок ${state.captureCount} захвачен');
+        print('Снимок ${state.captureCount} захвачен');
+      }
 
       // Ждем 500 миллисекунд перед следующим снимком
       await Future.delayed(const Duration(milliseconds: 500));
@@ -188,9 +204,34 @@ class CameraNotifier extends StateNotifier<CameraState> {
     });
   }
 
-  void disposeNotifier() {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState appState) {
+    if (appState == AppLifecycleState.paused) {
+      // Останавливаем камеру
+      _mediaStream?.getTracks().forEach((track) => track.stop());
+      _mediaStream = null;
+      print('Камера остановлена при паузе приложения');
+    } else if (appState == AppLifecycleState.resumed) {
+      // Инициализируем камеру снова
+      initializeCamera();
+      print('Камера инициализирована после возобновления приложения');
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Отменяем запланированный вызов requestAnimationFrame
+    if (_requestAnimationFrameId != null) {
+      html.window.cancelAnimationFrame(_requestAnimationFrameId!);
+      _requestAnimationFrameId = null;
+    }
+
+    // Останавливаем камеру и освобождаем ресурсы
     _mediaStream?.getTracks().forEach((track) => track.stop());
     _mediaStream = null;
+
     super.dispose();
   }
 }

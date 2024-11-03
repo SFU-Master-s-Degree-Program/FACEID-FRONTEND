@@ -4,17 +4,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../provider/providers.dart';
 
-class WebCameraWidget extends ConsumerWidget {
+class WebCameraWidget extends ConsumerStatefulWidget {
   const WebCameraWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  _WebCameraWidgetState createState() => _WebCameraWidgetState();
+}
+
+class _WebCameraWidgetState extends ConsumerState<WebCameraWidget> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(cameraNotifierProvider.notifier).initializeCamera();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cameraState = ref.watch(cameraNotifierProvider);
-    final cameraNotifier = ref.read(cameraNotifierProvider.notifier);
 
     if (cameraState.containerElement == null) {
-      // Инициализируем камеру при первом запуске
-      cameraNotifier.initializeCamera();
       return const Center(child: CircularProgressIndicator());
     } else {
       final String viewId = 'webcam-${cameraState.containerElement.hashCode}';
@@ -38,7 +48,7 @@ class WebCameraWidget extends ConsumerWidget {
               padding: const EdgeInsets.all(8),
               itemCount: cameraState.capturedImageUrls.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3, // Отображаем 3 изображения в ряд
+                crossAxisCount: 3,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
