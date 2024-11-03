@@ -1,5 +1,5 @@
-import 'package:face_id/features/auth/view/web_widget.dart';
 import 'package:flutter/material.dart';
+import '../camera/view/web_camera_widget.dart';
 
 class AuthPage extends StatelessWidget {
   const AuthPage({super.key});
