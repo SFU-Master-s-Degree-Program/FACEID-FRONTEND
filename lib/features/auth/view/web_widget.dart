@@ -1,3 +1,4 @@
+// web_camera_widget.dart
 import 'dart:html' as html;
 import 'dart:ui_web';
 import 'package:flutter/material.dart';
@@ -19,6 +20,12 @@ class WebCameraWidgetState extends State<WebCameraWidget>
   html.DivElement? _containerElement;
   html.MediaStream? _mediaStream;
   bool _isModelLoaded = false;
+
+  // Переменные для хранения снимков
+  final List<html.CanvasElement> _capturedImages = [];
+  final List<String> _capturedImageUrls = [];
+  int _captureCount = 0;
+  bool _isCapturing = false;
 
   @override
   void initState() {
@@ -86,7 +93,7 @@ class WebCameraWidgetState extends State<WebCameraWidget>
   }
 
   Future<void> _initializeFaceDetection() async {
-    talker.error('Инициализация обнаружения лиц');
+    talker.log('Инициализация обнаружения лиц');
 
     if (js_util.getProperty(html.window, 'faceapi') == null) {
       talker.error('faceapi не загружен');
@@ -94,13 +101,13 @@ class WebCameraWidgetState extends State<WebCameraWidget>
     }
 
     if (!_isModelLoaded) {
-      talker.info('Загрузка модели TinyFaceDetector');
+      talker.log('Загрузка модели TinyFaceDetector');
       // Загрузка модели
       await js_util.promiseToFuture(
         loadTinyFaceDetectorModel('assets/models'),
       );
       _isModelLoaded = true;
-      talker.info('Модель загружена');
+      talker.log('Модель загружена');
     }
 
     // Создаем опции, используя callConstructor
@@ -109,7 +116,7 @@ class WebCameraWidgetState extends State<WebCameraWidget>
     final options = js_util.callConstructor(
       js_util.getProperty(faceapi, 'TinyFaceDetectorOptions') as Function,
       [
-        js_util.jsify({'scoreThreshold': 0.5})
+        js_util.jsify({'scoreThreshold': 0.7})
       ],
     );
 
@@ -141,21 +148,32 @@ class WebCameraWidgetState extends State<WebCameraWidget>
       final length = js_util.getProperty(detections, 'length') as int;
       talker.log('Обнаружено лиц: $length');
 
-      for (int i = 0; i < length; i++) {
-        final detection = js_util.getProperty(detections, i);
-        final box = js_util.getProperty(detection, 'box');
-        final x = js_util.getProperty(box, 'x') as num;
-        final y = js_util.getProperty(box, 'y') as num;
-        final width = js_util.getProperty(box, 'width') as num;
-        final height = js_util.getProperty(box, 'height') as num;
+      if (length > 0) {
+        // Рисуем рамки вокруг обнаруженных лиц
+        for (int i = 0; i < length; i++) {
+          final detection = js_util.getProperty(detections, i);
+          final box = js_util.getProperty(detection, 'box');
+          final x = js_util.getProperty(box, 'x') as num;
+          final y = js_util.getProperty(box, 'y') as num;
+          final width = js_util.getProperty(box, 'width') as num;
+          final height = js_util.getProperty(box, 'height') as num;
 
-        // Рисуем рамку вокруг лица
-        context
-          ..beginPath()
-          ..rect(x, y, width, height)
-          ..lineWidth = 2
-          ..strokeStyle = 'green'
-          ..stroke();
+          // Рисуем рамку вокруг лица
+          context
+            ..beginPath()
+            ..rect(x, y, width, height)
+            ..lineWidth = 2
+            ..strokeStyle = 'red'
+            ..stroke();
+        }
+
+        // Захватываем снимки, если еще не начали
+        if (!_isCapturing && _captureCount < 6) {
+          _isCapturing = true;
+          _startImageCapture();
+        }
+      } else {
+        talker.log('Лица не обнаружены');
       }
     } else {
       talker.log('Лица не обнаружены');
@@ -163,6 +181,41 @@ class WebCameraWidgetState extends State<WebCameraWidget>
 
     // Запрашиваем следующий кадр
     html.window.requestAnimationFrame((_) => _detectFaces(options));
+  }
+
+  void _startImageCapture() {
+    Future.doWhile(() async {
+      if (_captureCount >= 6 || _videoElement == null) {
+        _isCapturing = false;
+        talker.log('Захвачено 6 снимков');
+        // Здесь можно остановить обнаружение или выполнить другие действия
+        return false;
+      }
+
+      // Создаем canvas для снимка
+      var snapshotCanvas = html.CanvasElement(
+        width: _videoElement!.videoWidth,
+        height: _videoElement!.videoHeight,
+      );
+      var snapshotContext = snapshotCanvas.context2D;
+      snapshotContext.drawImage(_videoElement!, 0, 0);
+
+      // Получаем dataUrl и сохраняем
+      String dataUrl = snapshotCanvas.toDataUrl();
+
+      // Обновляем состояние
+      setState(() {
+        _capturedImages.add(snapshotCanvas);
+        _capturedImageUrls.add(dataUrl);
+        _captureCount++;
+        talker.log('Снимок $_captureCount захвачен');
+      });
+
+      // Ждем 500 миллисекунд перед следующим снимком
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      return true; // Продолжаем цикл
+    });
   }
 
   @override
@@ -191,7 +244,34 @@ class WebCameraWidgetState extends State<WebCameraWidget>
       return const Center(child: CircularProgressIndicator());
     } else {
       final String viewId = 'webcam-${_containerElement.hashCode}';
-      return HtmlElementView(viewType: viewId);
+      return Column(
+        children: [
+          // Ограничиваем размер HtmlElementView с помощью SizedBox
+          SizedBox(
+            width: 640,
+            height: 480,
+            child: HtmlElementView(viewType: viewId),
+          ),
+          // Отображаем снимки
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: _capturedImageUrls.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3, // Отображаем 3 изображения в ряд
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemBuilder: (context, index) {
+                return Image.network(
+                  _capturedImageUrls[index],
+                  fit: BoxFit.cover,
+                );
+              },
+            ),
+          ),
+        ],
+      );
     }
   }
 }
