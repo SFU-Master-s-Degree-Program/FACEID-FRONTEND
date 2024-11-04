@@ -1,16 +1,21 @@
+import 'dart:async';
 import 'dart:html' as html;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:js_util' as js_util;
+import '../../../api/features.dart';
 import '../../../app/face_detection.dart';
-import 'camera_state.dart';
 import 'package:flutter/widgets.dart';
+import 'dart:js_util' as js_util;
+
+import '../../../main.dart';
+import 'camera_state.dart';
 
 class CameraNotifier extends StateNotifier<CameraState>
     with WidgetsBindingObserver {
   html.MediaStream? _mediaStream;
   int? _requestAnimationFrameId;
+  final ApiFeatures _apiFeatures;
 
-  CameraNotifier() : super(CameraState()) {
+  CameraNotifier(this._apiFeatures) : super(CameraState()) {
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -59,29 +64,29 @@ class CameraNotifier extends StateNotifier<CameraState>
 
         await _initializeFaceDetection();
       } catch (e) {
-        print('Ошибка при доступе к камере: $e');
+        talker.log('Ошибка при доступе к камере: $e');
       }
     } else {
-      print('Доступ к mediaDevices не поддерживается этим браузером.');
+      talker.log('Доступ к mediaDevices не поддерживается этим браузером.');
     }
   }
 
   Future<void> _initializeFaceDetection() async {
-    print('Инициализация обнаружения лиц');
+    talker.log('Инициализация обнаружения лиц');
 
     if (js_util.getProperty(html.window, 'faceapi') == null) {
-      print('faceapi не загружен');
+      talker.log('faceapi не загружен');
       return;
     }
 
     if (!state.isModelLoaded) {
-      print('Загрузка модели TinyFaceDetector');
+      talker.log('Загрузка модели TinyFaceDetector');
       // Загрузка модели
       await js_util.promiseToFuture(
         loadTinyFaceDetectorModel('assets/models'),
       );
       state = state.copyWith(isModelLoaded: true);
-      print('Модель загружена');
+      talker.log('Модель загружена');
     }
 
     // Создаем опции, используя callConstructor
@@ -94,7 +99,7 @@ class CameraNotifier extends StateNotifier<CameraState>
       ],
     );
 
-    print('Опции детектора созданы');
+    talker.log('Опции детектора созданы');
 
     // Запуск цикла обнаружения лиц
     _detectFaces(options);
@@ -105,57 +110,78 @@ class CameraNotifier extends StateNotifier<CameraState>
 
     if (state.videoElement == null || state.canvasElement == null) return;
 
-    // Обнаружение лиц
-    final detections = await js_util.promiseToFuture(
-      detectAllFaces(state.videoElement, options),
-    );
+    try {
+      // Обнаружение лиц
+      final detections = await js_util.promiseToFuture(
+        detectAllFaces(state.videoElement, options),
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // Очищаем canvas
-    final context = state.canvasElement!.context2D;
-    context.clearRect(
-        0, 0, state.canvasElement!.width!, state.canvasElement!.height!);
+      // Очищаем canvas
+      final context = state.canvasElement!.context2D;
+      context.clearRect(
+          0, 0, state.canvasElement!.width!, state.canvasElement!.height!);
 
-    // Обновляем размеры canvas
-    state.canvasElement!
-      ..width = state.videoElement!.videoWidth
-      ..height = state.videoElement!.videoHeight;
+      // Обновляем размеры canvas
+      state.canvasElement!
+        ..width = state.videoElement!.videoWidth
+        ..height = state.videoElement!.videoHeight;
 
-    // Проверяем, есть ли обнаружения
-    if (detections != null) {
-      final length = js_util.getProperty(detections, 'length') as int;
-      print('Обнаружено лиц: $length');
+      // Проверяем, есть ли обнаружения
+      if (detections != null) {
+        final length = js_util.getProperty(detections, 'length') as int;
+        //talker.log('Обнаружено лиц: $length');
 
-      if (length > 0) {
-        // Рисуем рамки вокруг обнаруженных лиц
-        for (int i = 0; i < length; i++) {
-          final detection = js_util.getProperty(detections, i);
-          final box = js_util.getProperty(detection, 'box');
-          final x = js_util.getProperty(box, 'x') as num;
-          final y = js_util.getProperty(box, 'y') as num;
-          final width = js_util.getProperty(box, 'width') as num;
-          final height = js_util.getProperty(box, 'height') as num;
+        if (length > 0) {
+          // Рисуем рамки вокруг обнаруженных лиц
+          for (int i = 0; i < length; i++) {
+            final detection = js_util.getProperty(detections, i);
+            if (detection == null) {
+              talker.log('Обнаружение $i является null');
+              continue;
+            }
 
-          // Рисуем рамку вокруг лица
-          context
-            ..beginPath()
-            ..rect(x, y, width, height)
-            ..lineWidth = 2
-            ..strokeStyle = 'red'
-            ..stroke();
-        }
+            final box = js_util.getProperty(detection, 'box');
+            if (box == null) {
+              talker.log('Box для обнаружения $i является null');
+              continue;
+            }
 
-        // Захватываем снимки, если еще не начали
-        if (!state.isCapturing && state.captureCount < 6) {
-          state = state.copyWith(isCapturing: true);
-          _startImageCapture();
+            final x = js_util.getProperty(box, 'x') as num?;
+            final y = js_util.getProperty(box, 'y') as num?;
+            final width = js_util.getProperty(box, 'width') as num?;
+            final height = js_util.getProperty(box, 'height') as num?;
+
+            if (x == null || y == null || width == null || height == null) {
+              talker.log(
+                  'Некоторые свойства бокса для обнаружения $i являются null');
+              continue;
+            }
+
+            // Рисуем рамку вокруг лица
+            context
+              ..beginPath()
+              ..rect(x, y, width, height)
+              ..lineWidth = 2
+              ..strokeStyle = 'red'
+              ..stroke();
+          }
+
+          // Захватываем снимки, если еще не начали и нужно захватить 6 снимков
+          if (!state.isCapturing && state.captureCount < 6) {
+            state = state.copyWith(isCapturing: true);
+            _startImageCapture();
+          }
+        } else {
+          //talker.log('Лица не обнаружены');
         }
       } else {
-        print('Лица не обнаружены');
+        //talker.log('Лица не обнаружены');
       }
-    } else {
-      print('Лица не обнаружены');
+    } catch (e, stack) {
+      talker.log('Ошибка в _detectFaces: $e');
+      talker.log(stack);
     }
 
     // Запрашиваем следующий кадр, если виджет все еще смонтирован
@@ -171,8 +197,9 @@ class CameraNotifier extends StateNotifier<CameraState>
 
       if (state.captureCount >= 6 || state.videoElement == null) {
         state = state.copyWith(isCapturing: false);
-        print('Захвачено 6 снимков');
-        // Здесь можно остановить обнаружение или выполнить другие действия
+        talker.log('Захвачено 6 снимков');
+        // Отправляем изображения на сервер
+        await _sendCapturedImages();
         return false;
       }
 
@@ -194,7 +221,7 @@ class CameraNotifier extends StateNotifier<CameraState>
           capturedImageUrls: [...state.capturedImageUrls, dataUrl],
         );
 
-        print('Снимок ${state.captureCount} захвачен');
+        talker.log('Снимок ${state.captureCount} захвачен');
       }
 
       // Ждем 500 миллисекунд перед следующим снимком
@@ -204,17 +231,69 @@ class CameraNotifier extends StateNotifier<CameraState>
     });
   }
 
+  Future<void> _sendCapturedImages() async {
+    if (state.capturedImageUrls.length < 6) {
+      talker.log('Недостаточно снимков для отправки');
+      return;
+    }
+
+    talker.log('Отправка 6 снимков на сервер для аутентификации');
+
+    List<Map<String, dynamic>> results = [];
+
+    try {
+      // Отправляем каждое изображение по отдельности
+      for (int i = 0; i < state.capturedImageUrls.length; i++) {
+        final response = await _apiFeatures.recognizeEmployee(
+          imageDataUrl: state.capturedImageUrls[i],
+        );
+        talker.log('Ответ сервера для снимка ${i + 1}: $response');
+        results.add(response);
+      }
+
+      // Обновляем состояние с результатами аутентификации
+      state = state.copyWith(recognitionResults: results);
+    } catch (e) {
+      talker.log('Ошибка при отправке снимков на сервер: $e');
+      // Вы можете сохранить ошибку в состоянии, если необходимо
+    }
+  }
+
+  /// Метод для сброса состояния и начала процесса заново
+  Future<void> reset() async {
+    // Останавливаем текущий процесс обнаружения лиц
+    if (_requestAnimationFrameId != null) {
+      html.window.cancelAnimationFrame(_requestAnimationFrameId!);
+      _requestAnimationFrameId = null;
+    }
+
+    // Останавливаем камеру
+    _mediaStream?.getTracks().forEach((track) => track.stop());
+    _mediaStream = null;
+
+    // Удаляем контейнер из DOM, если он существует
+    if (state.containerElement != null) {
+      state.containerElement!.remove();
+    }
+
+    // Сбрасываем состояние
+    state = CameraState();
+
+    // Повторно инициализируем камеру
+    await initializeCamera();
+  }
+
   @override
-  void didChangeAppLifecycleState(AppLifecycleState appState) {
-    if (appState == AppLifecycleState.paused) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
       // Останавливаем камеру
       _mediaStream?.getTracks().forEach((track) => track.stop());
       _mediaStream = null;
-      print('Камера остановлена при паузе приложения');
-    } else if (appState == AppLifecycleState.resumed) {
+      talker.log('Камера остановлена при паузе приложения');
+    } else if (state == AppLifecycleState.resumed) {
       // Инициализируем камеру снова
       initializeCamera();
-      print('Камера инициализирована после возобновления приложения');
+      talker.log('Камера инициализирована после возобновления приложения');
     }
   }
 

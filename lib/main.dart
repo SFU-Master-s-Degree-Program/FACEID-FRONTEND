@@ -7,7 +7,20 @@ import 'features/error/view/error_page.dart';
 import 'features/home/view/home_page.dart';
 import 'features/registeration/view/register_page.dart';
 
-final talker = Talker();
+final talker = Talker(
+  settings: TalkerSettings(
+    enabled: true,
+    useHistory: true,
+    maxHistoryItems: 100,
+    useConsoleLogs: true,
+    colors: {
+      TalkerLogType.httpResponse: AnsiPen()..blue(),
+      TalkerLogType.error: AnsiPen()..red(),
+      TalkerLogType.info: AnsiPen()..yellow(),
+      TalkerLogType.debug: AnsiPen()..black(),
+    },
+  ),
+);
 
 void main() {
   runApp(const ProviderScope(child: MyApp()));
