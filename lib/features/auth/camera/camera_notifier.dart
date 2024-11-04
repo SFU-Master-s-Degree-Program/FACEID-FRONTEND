@@ -131,7 +131,6 @@ class CameraNotifier extends StateNotifier<CameraState>
       // Проверяем, есть ли обнаружения
       if (detections != null) {
         final length = js_util.getProperty(detections, 'length') as int;
-        //talker.log('Обнаружено лиц: $length');
 
         if (length > 0) {
           // Рисуем рамки вокруг обнаруженных лиц
@@ -174,10 +173,10 @@ class CameraNotifier extends StateNotifier<CameraState>
             _startImageCapture();
           }
         } else {
-          //talker.log('Лица не обнаружены');
+          // Нет обнаруженных лиц
         }
       } else {
-        //talker.log('Лица не обнаружены');
+        // Нет обнаруженных лиц
       }
     } catch (e, stack) {
       talker.log('Ошибка в _detectFaces: $e');
@@ -239,23 +238,28 @@ class CameraNotifier extends StateNotifier<CameraState>
 
     talker.log('Отправка 6 снимков на сервер для аутентификации');
 
-    List<Map<String, dynamic>> results = [];
-
     try {
-      // Отправляем каждое изображение по отдельности
-      for (int i = 0; i < state.capturedImageUrls.length; i++) {
-        final response = await _apiFeatures.recognizeEmployee(
-          imageDataUrl: state.capturedImageUrls[i],
-        );
-        talker.log('Ответ сервера для снимка ${i + 1}: $response');
-        results.add(response);
-      }
+      // Отправляем все изображения одним запросом
+      final responses = await _apiFeatures.recognizeEmployees(
+        imageDataUrls: state.capturedImageUrls,
+      );
+
+      talker.log('Ответ сервера: $responses');
 
       // Обновляем состояние с результатами аутентификации
-      state = state.copyWith(recognitionResults: results);
+      state = state.copyWith(
+        recognitionResults: responses,
+        errorMessage: null, // Очищаем предыдущие ошибки
+      );
     } catch (e) {
+      // Обработка ошибок при отправке
       talker.log('Ошибка при отправке снимков на сервер: $e');
-      // Вы можете сохранить ошибку в состоянии, если необходимо
+
+      // Обновляем состояние с сообщением об ошибке
+      state = state.copyWith(
+        recognitionResults: [],
+        errorMessage: e.toString(),
+      );
     }
   }
 

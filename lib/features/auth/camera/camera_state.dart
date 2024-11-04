@@ -9,6 +9,7 @@ class CameraState {
   final int captureCount;
   final List<String> capturedImageUrls;
   final List<Map<String, dynamic>> recognitionResults;
+  final String? errorMessage; // Новое поле для хранения сообщений об ошибках
 
   CameraState({
     this.videoElement,
@@ -19,6 +20,7 @@ class CameraState {
     this.captureCount = 0,
     this.capturedImageUrls = const [],
     this.recognitionResults = const [],
+    this.errorMessage, // Инициализация нового поля
   });
 
   CameraState copyWith({
@@ -30,6 +32,7 @@ class CameraState {
     int? captureCount,
     List<String>? capturedImageUrls,
     List<Map<String, dynamic>>? recognitionResults,
+    String? errorMessage, // Добавление нового поля в метод copyWith
   }) {
     return CameraState(
       videoElement: videoElement ?? this.videoElement,
@@ -40,6 +43,7 @@ class CameraState {
       captureCount: captureCount ?? this.captureCount,
       capturedImageUrls: capturedImageUrls ?? this.capturedImageUrls,
       recognitionResults: recognitionResults ?? this.recognitionResults,
+      errorMessage: errorMessage ?? this.errorMessage, // Обновление нового поля
     );
   }
 }

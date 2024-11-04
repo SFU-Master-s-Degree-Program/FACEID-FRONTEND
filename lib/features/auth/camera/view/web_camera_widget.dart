@@ -79,51 +79,75 @@ class WebCameraWidgetState extends ConsumerState<WebCameraWidget> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Отображение результатов аутентификации
-                      if (cameraState.recognitionResults.isNotEmpty)
+                      // Отображение результатов аутентификации или ошибок
+                      if (cameraState.recognitionResults.isNotEmpty ||
+                          cameraState.errorMessage != null)
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Результаты аутентификации:',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              if (cameraState
+                                  .recognitionResults.isNotEmpty) ...[
+                                const Text(
+                                  'Результаты аутентификации:',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              // Ограничиваем высоту ListView.builder
-                              SizedBox(
-                                height: 200, // Установите подходящую высоту
-                                child: ListView.builder(
-                                  itemCount:
-                                      cameraState.recognitionResults.length,
-                                  itemBuilder: (context, index) {
-                                    final result =
-                                        cameraState.recognitionResults[index];
-                                    final matched = result['matched'] ?? false;
-                                    final name =
-                                        result['name'] ?? 'Неизвестный';
-                                    final similarity = result['similarity']
-                                            ?.toStringAsFixed(2) ??
-                                        '0.00';
+                                const SizedBox(height: 8),
+                                // Ограничиваем высоту ListView.builder
+                                SizedBox(
+                                  height: 200, // Установите подходящую высоту
+                                  child: ListView.builder(
+                                    itemCount:
+                                        cameraState.recognitionResults.length,
+                                    itemBuilder: (context, index) {
+                                      final result =
+                                          cameraState.recognitionResults[index];
+                                      final matched =
+                                          result['matched'] ?? false;
+                                      final name =
+                                          result['name'] ?? 'Неизвестный';
+                                      final similarity = result['similarity']
+                                              ?.toStringAsFixed(2) ??
+                                          '0.00';
 
-                                    return ListTile(
-                                      leading: Icon(
-                                        matched
-                                            ? Icons.check_circle
-                                            : Icons.cancel,
-                                        color:
-                                            matched ? Colors.green : Colors.red,
-                                      ),
-                                      title: Text(name),
-                                      subtitle: Text('Схожесть: $similarity'),
-                                    );
-                                  },
+                                      return ListTile(
+                                        leading: Icon(
+                                          matched
+                                              ? Icons.check_circle
+                                              : Icons.cancel,
+                                          color: matched
+                                              ? Colors.green
+                                              : Colors.red,
+                                        ),
+                                        title: Text(name),
+                                        subtitle: Text('Схожесть: $similarity'),
+                                      );
+                                    },
+                                  ),
                                 ),
-                              ),
+                              ],
+                              if (cameraState.errorMessage != null) ...[
+                                const Text(
+                                  'Ошибка:',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  cameraState.errorMessage!,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 16),
                               // Кнопка "Начать заново"
                               Center(

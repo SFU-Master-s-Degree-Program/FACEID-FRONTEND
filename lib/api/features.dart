@@ -54,30 +54,70 @@ class ApiFeatures {
     }
   }
 
-  /// Аутентификация сотрудника
-  Future<Map<String, dynamic>> recognizeEmployee({
-    required String imageDataUrl,
+  /// Аутентификация сотрудников с отправкой нескольких изображений
+  Future<List<Map<String, dynamic>>> recognizeEmployees({
+    required List<String> imageDataUrls,
   }) async {
     try {
-      final String base64Data = imageDataUrl.split(',').last;
-      final bytes = base64Decode(base64Data);
-      final multipartFile = MultipartFile.fromBytes(
-        bytes,
-        filename: 'image_${DateTime.now().millisecondsSinceEpoch}.png',
-        contentType: MediaType('image', 'png'),
-      );
+      List<MultipartFile> files = imageDataUrls.map((dataUrl) {
+        final String base64Data = dataUrl.split(',').last;
+        final bytes = base64Decode(base64Data);
+        return MultipartFile.fromBytes(
+          bytes,
+          filename: 'image_${DateTime.now().millisecondsSinceEpoch}.png',
+          contentType: MediaType('image', 'png'),
+        );
+      }).toList();
 
-      FormData formData = FormData.fromMap({
-        'file': multipartFile,
-      });
+      // Создаем пустой FormData
+      FormData formData = FormData();
 
+      // Добавляем каждый файл с ключом 'file'
+      for (var file in files) {
+        formData.files.add(MapEntry('file', file));
+      }
+
+      // Отправляем запрос
       Response response =
           await _apiService.postRequest('/recognize/', data: formData);
-      talker.log('Аутентификация сотрудника: ${response.data}');
-      return response.data;
+
+      talker.log('Аутентификация сотрудников: ${response.data}');
+
+      // Обработка ответа
+      if (response.data is List) {
+        // Если сервер возвращает список результатов
+        List<dynamic> results = response.data;
+        return results.cast<Map<String, dynamic>>();
+      } else if (response.data is Map<String, dynamic>) {
+        // Если сервер возвращает один результат, оборачиваем его в список
+        return [response.data];
+      } else {
+        throw Exception("Неожиданный формат ответа от сервера");
+      }
+    } on DioException catch (e) {
+      // Извлекаем сообщение об ошибке из ответа сервера
+      String errorMsg = 'Неизвестная ошибка';
+
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('detail')) {
+            if (data['detail'] is String) {
+              errorMsg = data['detail'];
+            } else if (data['detail'] is List) {
+              errorMsg = data['detail'].map((d) => d.toString()).join(', ');
+            }
+          }
+        }
+      }
+
+      talker.log('Ошибка при аутентификации сотрудников: $errorMsg');
+
+      // Выбрасываем исключение с сообщением об ошибке
+      throw Exception(errorMsg);
     } catch (e) {
-      talker.log('Ошибка при аутентификации сотрудника: $e');
-      rethrow;
+      talker.log('Неизвестная ошибка при аутентификации сотрудников: $e');
+      throw Exception('Неизвестная ошибка: $e');
     }
   }
 
