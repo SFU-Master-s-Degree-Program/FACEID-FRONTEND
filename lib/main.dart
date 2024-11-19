@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'features/auth/camera/view/gallery_widget.dart';
 import 'features/auth/view/auth_page.dart';
 import 'features/error/view/error_page.dart';
 import 'features/home/view/home_page.dart';
@@ -46,6 +47,10 @@ class MyApp extends ConsumerWidget {
         GoRoute(
           path: '/register',
           builder: (context, state) => const RegisterPage(),
+        ),
+        GoRoute(
+          path: '/gallery',
+          builder: (context, state) => const GalleryWidget(),
         ),
       ],
       errorBuilder: (context, state) => const ErrorPage(),

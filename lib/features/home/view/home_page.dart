@@ -45,6 +45,13 @@ class HomePage extends StatelessWidget {
                 context.go('/register');
               },
             ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              child: const Text('Тестовая проверка'),
+              onPressed: () {
+                context.go('/gallery');
+              },
+            ),
           ],
         ),
       ),

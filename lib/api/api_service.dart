@@ -6,7 +6,7 @@ import 'package:talker_dio_logger/talker_dio_logger.dart'; // Импорт Talke
 class ApiService {
   final Dio dio;
 
-  ApiService({String baseUrl = 'http://127.0.0.1:8000'})
+  ApiService({String baseUrl = 'http://127.0.0.1:8001'})
       : dio = Dio(BaseOptions(
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 10),

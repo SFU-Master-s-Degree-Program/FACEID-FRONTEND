@@ -4,6 +4,8 @@ import '../api/api_service.dart';
 import '../api/features.dart';
 import '../features/auth/camera/camera_notifier.dart';
 import '../features/auth/camera/camera_state.dart';
+import '../features/auth/camera/gallery_notifier.dart';
+import '../features/auth/camera/gallery_state.dart';
 import '../features/registeration/registration_notifier.dart';
 import '../features/registeration/registration_state.dart';
 
@@ -24,3 +26,9 @@ final cameraNotifierProvider =
     StateNotifierProvider<CameraNotifier, CameraState>(
   (ref) => CameraNotifier(ref.watch(apiFeaturesProvider)),
 );
+
+final galleryNotifierProvider =
+    StateNotifierProvider<GalleryNotifier, GalleryState>((ref) {
+  final apiFeatures = ref.watch(apiFeaturesProvider);
+  return GalleryNotifier(apiFeatures);
+});
